@@ -1,0 +1,6 @@
+{
+  "name": "Toplotne izgube",
+  "description": "Inženirski kalkulator toplotnih izgub stavbe, Glaserjevega diagrama točke rosišča, toplotne črpalke, sončne elektrarne z baterijo in talnega gretja (ISO 13788, PURES-3).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
