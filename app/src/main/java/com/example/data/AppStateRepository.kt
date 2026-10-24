@@ -29,15 +29,68 @@ class AppStateRepository(context: Context) {
         }
     }
 
-    private fun serialize(state: AppState): String {
+    fun exportToJson(state: AppState): String {
+        return serialize(state, indent = 2)
+    }
+
+    fun importFromJson(jsonStr: String): AppState {
+        return deserialize(jsonStr)
+    }
+
+    // Local Named Projects Storage
+    fun getSavedProjects(): List<Pair<String, Long>> {
+        val json = prefs.getString("named_projects_meta", "{}") ?: "{}"
+        val obj = JSONObject(json)
+        val list = mutableListOf<Pair<String, Long>>()
+        val keys = obj.keys()
+        while (keys.hasNext()) {
+            val k = keys.next()
+            list.add(Pair(k, obj.optLong(k, 0L)))
+        }
+        return list.sortedByDescending { it.second }
+    }
+
+    fun saveNamedProject(name: String, state: AppState) {
+        val jsonStr = serialize(state)
+        prefs.edit().putString("proj_$name", jsonStr).apply()
+
+        // Update meta
+        val metaJson = prefs.getString("named_projects_meta", "{}") ?: "{}"
+        val meta = JSONObject(metaJson)
+        meta.put(name, System.currentTimeMillis())
+        prefs.edit().putString("named_projects_meta", meta.toString()).apply()
+    }
+
+    fun loadNamedProject(name: String): AppState? {
+        val jsonStr = prefs.getString("proj_$name", null) ?: return null
+        return try {
+            deserialize(jsonStr)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    fun deleteNamedProject(name: String) {
+        prefs.edit().remove("proj_$name").apply()
+        val metaJson = prefs.getString("named_projects_meta", "{}") ?: "{}"
+        val meta = JSONObject(metaJson)
+        meta.remove(name)
+        prefs.edit().putString("named_projects_meta", meta.toString()).apply()
+    }
+
+    private fun serialize(state: AppState, indent: Int = 0): String {
         val root = JSONObject()
         root.put("version", state.version)
         root.put("isDarkMode", state.isDarkMode)
         root.put("activeTabId", state.activeTabId)
         root.put("bomWastePct", state.bomWastePct)
-        root.put("rafterWidthCm", state.rafterWidthCm)
-        root.put("rafterSpacingCm", state.rafterSpacingCm)
         root.put("roiFuelId", state.roiFuelId)
+
+        val rafterObj = JSONObject()
+        rafterObj.put("widthCm", state.rafterWidthCm)
+        rafterObj.put("spacingCm", state.rafterSpacingCm)
+        root.put("rafterHelper", rafterObj)
 
         // Boundary
         val b = JSONObject()
@@ -142,7 +195,7 @@ class AppStateRepository(context: Context) {
         vObj.put("selectedUnitId", state.ventilation.selectedUnitId)
         root.put("ventilation", vObj)
 
-        // DHW
+        // DHW & Well
         val dwObj = JSONObject()
         dwObj.put("dhwEnabled", state.dhwAndWell.dhwEnabled)
         dwObj.put("dhwSourceMode", state.dhwAndWell.dhwSourceMode)
@@ -179,6 +232,41 @@ class AppStateRepository(context: Context) {
         hpObj.put("baseHousePeakKw", state.hpSettings.baseHousePeakKw)
         root.put("hpSettings", hpObj)
 
+        // Meter Data
+        val mdObj = JSONObject()
+        mdObj.put("enabled", state.meterData.enabled)
+        mdObj.put("totalMeterKwh", state.meterData.totalMeterKwh)
+        mdObj.put("vtKwh", state.meterData.vtKwh)
+        mdObj.put("mtKwh", state.meterData.mtKwh)
+        mdObj.put("measuredHpElKwh", state.meterData.measuredHpElKwh)
+        mdObj.put("measuredAcElKwh", state.meterData.measuredAcElKwh)
+        mdObj.put("measuredHouseholdKwh", state.meterData.measuredHouseholdKwh)
+        mdObj.put("annualBillEur", state.meterData.annualBillEur)
+        val monthlyArr = JSONArray()
+        state.meterData.monthlyTotalKwh.forEach { monthlyArr.put(it) }
+        mdObj.put("monthlyTotalKwh", monthlyArr)
+        root.put("meterData", mdObj)
+
+        // Solar and Grid
+        val sgObj = JSONObject()
+        sgObj.put("pvKwp", state.solarAndGrid.pvKwp)
+        sgObj.put("specificYield", state.solarAndGrid.specificYield)
+        sgObj.put("simLoadSource", state.solarAndGrid.simLoadSource)
+        sgObj.put("batteryCapKwh", state.solarAndGrid.batteryCapKwh)
+        sgObj.put("batteryDodPct", state.solarAndGrid.batteryDodPct)
+        sgObj.put("batteryEffPct", state.solarAndGrid.batteryEffPct)
+        sgObj.put("directSelfConsPct", state.solarAndGrid.directSelfConsPct)
+        sgObj.put("exportMode", state.solarAndGrid.exportMode)
+        sgObj.put("exportPriceEur", state.solarAndGrid.exportPriceEur)
+        sgObj.put("gridImportPriceEur", state.solarAndGrid.gridImportPriceEur)
+        sgObj.put("batteryInvestEur", state.solarAndGrid.batteryInvestEur)
+        root.put("solarAndGrid", sgObj)
+
+        // Hydraulics
+        val hydObj = JSONObject()
+        hydObj.put("floorDeltaT", state.hydraulics.floorDeltaT)
+        root.put("hydraulics", hydObj)
+
         // Fuels
         val fuelArr = JSONArray()
         state.fuels.forEach { f ->
@@ -208,6 +296,42 @@ class AppStateRepository(context: Context) {
         }
         root.put("rooms", rmArr)
 
+        // ROI
+        val roiObj = JSONObject()
+        roiObj.put("selectedFuelId", state.roiFuelId)
+        val roiArr = JSONArray()
+        state.roiMeasures.forEach { m ->
+            val mo = JSONObject()
+            mo.put("id", m.id)
+            mo.put("name", m.name)
+            mo.put("area", m.area)
+            mo.put("uBefore", m.uBefore)
+            mo.put("uAfter", m.uAfter)
+            mo.put("invest", m.invest)
+            mo.put("subsidy", m.subsidy)
+            roiArr.put(mo)
+        }
+        roiObj.put("measures", roiArr)
+        root.put("roi", roiObj)
+
+        // Custom Materials
+        val matsArr = JSONArray()
+        state.customMaterials.forEach { cm ->
+            val mo = JSONObject()
+            mo.put("id", cm.id)
+            mo.put("group", cm.group)
+            mo.put("name", cm.name)
+            mo.put("defD", cm.defD)
+            mo.put("lambda", cm.lambda)
+            mo.put("mu", cm.mu)
+            mo.put("rho", cm.rho)
+            mo.put("c", cm.c)
+            mo.put("color", cm.colorHex)
+            mo.put("ventilated", cm.ventilated)
+            matsArr.put(mo)
+        }
+        root.put("customMaterials", matsArr)
+
         // Scenario A
         state.scenarioA?.let { sa ->
             val sObj = JSONObject()
@@ -217,7 +341,7 @@ class AppStateRepository(context: Context) {
             root.put("scenarioA", sObj)
         }
 
-        return root.toString()
+        return if (indent > 0) root.toString(indent) else root.toString()
     }
 
     private fun deserialize(jsonStr: String): AppState {
@@ -227,10 +351,15 @@ class AppStateRepository(context: Context) {
         val isDarkMode = root.optBoolean("isDarkMode", def.isDarkMode)
         val activeTabId = root.optString("activeTabId", def.activeTabId)
         val bomWastePct = root.optDouble("bomWastePct", def.bomWastePct)
-        val rafterWidthCm = root.optDouble("rafterWidthCm", def.rafterWidthCm)
-        val rafterSpacingCm = root.optDouble("rafterSpacingCm", def.rafterSpacingCm)
-        val roiFuelId = root.optString("roiFuelId", def.roiFuelId)
 
+        // Rafter helper
+        val rafterObj = root.optJSONObject("rafterHelper")
+        val rafterWidthCm = rafterObj?.optDouble("widthCm", def.rafterWidthCm)
+            ?: root.optDouble("rafterWidthCm", def.rafterWidthCm)
+        val rafterSpacingCm = rafterObj?.optDouble("spacingCm", def.rafterSpacingCm)
+            ?: root.optDouble("rafterSpacingCm", def.rafterSpacingCm)
+
+        // Boundary
         val bObj = root.optJSONObject("boundary")
         val boundary = if (bObj != null) {
             BoundaryCondition(
@@ -286,6 +415,269 @@ class AppStateRepository(context: Context) {
         val roofs = parseElements("roofs", def.roofs)
         val floors = parseElements("floors", def.floors)
 
+        // Windows
+        val winList = mutableListOf<WindowElement>()
+        root.optJSONArray("windows")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                winList.add(
+                    WindowElement(
+                        id = o.optString("id", "win_$i"),
+                        name = o.optString("name", "Okno"),
+                        w = o.optDouble("w", 1.2),
+                        h = o.optDouble("h", 1.4),
+                        count = o.optInt("count", 1),
+                        uw = o.optDouble("uw", 0.85),
+                        g = o.optDouble("g", 0.50),
+                        orient = o.optString("orient", "J"),
+                        fx = o.optDouble("fx", 1.0)
+                    )
+                )
+            }
+        }
+        val windows = if (winList.isNotEmpty()) winList else def.windows
+
+        // Doors
+        val doorList = mutableListOf<DoorElement>()
+        root.optJSONArray("doors")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                doorList.add(
+                    DoorElement(
+                        id = o.optString("id", "d_$i"),
+                        name = o.optString("name", "Vrata"),
+                        area = o.optDouble("area", 2.0),
+                        ud = o.optDouble("ud", 1.1),
+                        fx = o.optDouble("fx", 1.0)
+                    )
+                )
+            }
+        }
+        val doors = if (doorList.isNotEmpty()) doorList else def.doors
+
+        // Bridges
+        val bridges = root.optJSONObject("bridges")?.let { bo ->
+            val items = mutableListOf<BridgeItem>()
+            bo.optJSONArray("items")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    items.add(
+                        BridgeItem(
+                            id = o.optString("id", "tb_$i"),
+                            name = o.optString("name", "Most"),
+                            length = o.optDouble("length", 10.0),
+                            psi = o.optDouble("psi", 0.10),
+                            fx = o.optDouble("fx", 1.0)
+                        )
+                    )
+                }
+            }
+            BridgeSettings(
+                enabled = bo.optBoolean("enabled", def.bridges.enabled),
+                useFlatRate = bo.optBoolean("useFlatRate", def.bridges.useFlatRate),
+                flatDeltaU = bo.optDouble("flatDeltaU", def.bridges.flatDeltaU),
+                items = if (items.isNotEmpty()) items else def.bridges.items
+            )
+        } ?: def.bridges
+
+        // Ventilation
+        val ventilation = root.optJSONObject("ventilation")?.let { vo ->
+            VentilationSettings(
+                enabled = vo.optBoolean("enabled", def.ventilation.enabled),
+                volumeArea = vo.optDouble("volumeArea", def.ventilation.volumeArea),
+                ceilingHeight = vo.optDouble("ceilingHeight", def.ventilation.ceilingHeight),
+                airChanges = vo.optDouble("airChanges", def.ventilation.airChanges),
+                heatRecoveryEff = vo.optDouble("heatRecoveryEff", def.ventilation.heatRecoveryEff),
+                selectedUnitId = vo.optString("selectedUnitId", def.ventilation.selectedUnitId)
+            )
+        } ?: def.ventilation
+
+        // DHW & Well
+        val dhwAndWell = root.optJSONObject("dhwAndWell")?.let { dwo ->
+            DhwAndWellSettings(
+                dhwEnabled = dwo.optBoolean("dhwEnabled", def.dhwAndWell.dhwEnabled),
+                dhwSourceMode = dwo.optString("dhwSourceMode", def.dhwAndWell.dhwSourceMode),
+                mainHpDhwCop = dwo.optDouble("mainHpDhwCop", def.dhwAndWell.mainHpDhwCop),
+                sanitaryHpCop = dwo.optDouble("sanitaryHpCop", def.dhwAndWell.sanitaryHpCop),
+                persons = dwo.optInt("persons", def.dhwAndWell.persons),
+                litersPerPerson = dwo.optDouble("litersPerPerson", def.dhwAndWell.litersPerPerson),
+                tempCold = dwo.optDouble("tempCold", def.dhwAndWell.tempCold),
+                tempHot = dwo.optDouble("tempHot", def.dhwAndWell.tempHot),
+                tankLossPct = dwo.optDouble("tankLossPct", def.dhwAndWell.tankLossPct),
+                wellPumpAutoSync = dwo.optBoolean("wellPumpAutoSync", def.dhwAndWell.wellPumpAutoSync),
+                hpThermalPowerKw = dwo.optDouble("hpThermalPowerKw", def.dhwAndWell.hpThermalPowerKw),
+                hpMachineCop = dwo.optDouble("hpMachineCop", def.dhwAndWell.hpMachineCop),
+                wellPumpWatts = dwo.optDouble("wellPumpWatts", def.dhwAndWell.wellPumpWatts),
+                wellWaterDeltaT = dwo.optDouble("wellWaterDeltaT", def.dhwAndWell.wellWaterDeltaT),
+                summerIndoorTemp = dwo.optDouble("summerIndoorTemp", def.dhwAndWell.summerIndoorTemp),
+                summerIndoorRh = dwo.optDouble("summerIndoorRh", def.dhwAndWell.summerIndoorRh)
+            )
+        } ?: def.dhwAndWell
+
+        // HP Settings
+        val hpSettings = root.optJSONObject("hpSettings")?.let { hpo ->
+            HpSettings(
+                selectedHpFuelId = hpo.optString("selectedHpFuelId", def.hpSettings.selectedHpFuelId),
+                nominalThermalKw = hpo.optDouble("nominalThermalKw", def.hpSettings.nominalThermalKw),
+                minModulationKw = hpo.optDouble("minModulationKw", def.hpSettings.minModulationKw),
+                maxThermalKwAtPeak = hpo.optDouble("maxThermalKwAtPeak", def.hpSettings.maxThermalKwAtPeak),
+                peakElMode = hpo.optString("peakElMode", def.hpSettings.peakElMode),
+                manualPeakElKw = hpo.optDouble("manualPeakElKw", def.hpSettings.manualPeakElKw),
+                maxCompressorElKw = hpo.optDouble("maxCompressorElKw", def.hpSettings.maxCompressorElKw),
+                copAtDesignTe = hpo.optDouble("copAtDesignTe", def.hpSettings.copAtDesignTe),
+                auxPumpsWatts = hpo.optDouble("auxPumpsWatts", def.hpSettings.auxPumpsWatts),
+                bivalentTemp = hpo.optDouble("bivalentTemp", def.hpSettings.bivalentTemp),
+                backupHeaterKw = hpo.optDouble("backupHeaterKw", def.hpSettings.backupHeaterKw),
+                fuseAmps = hpo.optInt("fuseAmps", def.hpSettings.fuseAmps),
+                baseHousePeakKw = hpo.optDouble("baseHousePeakKw", def.hpSettings.baseHousePeakKw)
+            )
+        } ?: def.hpSettings
+
+        // Meter Data
+        val meterData = root.optJSONObject("meterData")?.let { mdo ->
+            val monthly = mutableListOf<Double>()
+            mdo.optJSONArray("monthlyTotalKwh")?.let { arr ->
+                for (i in 0 until arr.length()) monthly.add(arr.optDouble(i, 0.0))
+            }
+            MeterData(
+                enabled = mdo.optBoolean("enabled", def.meterData.enabled),
+                totalMeterKwh = mdo.optDouble("totalMeterKwh", def.meterData.totalMeterKwh),
+                vtKwh = mdo.optDouble("vtKwh", def.meterData.vtKwh),
+                mtKwh = mdo.optDouble("mtKwh", def.meterData.mtKwh),
+                measuredHpElKwh = mdo.optDouble("measuredHpElKwh", def.meterData.measuredHpElKwh),
+                measuredAcElKwh = mdo.optDouble("measuredAcElKwh", def.meterData.measuredAcElKwh),
+                measuredHouseholdKwh = mdo.optDouble("measuredHouseholdKwh", def.meterData.measuredHouseholdKwh),
+                annualBillEur = mdo.optDouble("annualBillEur", def.meterData.annualBillEur),
+                monthlyTotalKwh = if (monthly.size == 12) monthly else def.meterData.monthlyTotalKwh
+            )
+        } ?: def.meterData
+
+        // Solar and Grid
+        val solarAndGrid = root.optJSONObject("solarAndGrid")?.let { sgo ->
+            SolarAndGridSettings(
+                pvKwp = sgo.optDouble("pvKwp", def.solarAndGrid.pvKwp),
+                specificYield = sgo.optDouble("specificYield", def.solarAndGrid.specificYield),
+                simLoadSource = sgo.optString("simLoadSource", def.solarAndGrid.simLoadSource),
+                batteryCapKwh = sgo.optDouble("batteryCapKwh", def.solarAndGrid.batteryCapKwh),
+                batteryDodPct = sgo.optDouble("batteryDodPct", def.solarAndGrid.batteryDodPct),
+                batteryEffPct = sgo.optDouble("batteryEffPct", def.solarAndGrid.batteryEffPct),
+                directSelfConsPct = sgo.optDouble("directSelfConsPct", def.solarAndGrid.directSelfConsPct),
+                exportMode = sgo.optString("exportMode", def.solarAndGrid.exportMode),
+                exportPriceEur = sgo.optDouble("exportPriceEur", def.solarAndGrid.exportPriceEur),
+                gridImportPriceEur = sgo.optDouble("gridImportPriceEur", def.solarAndGrid.gridImportPriceEur),
+                batteryInvestEur = sgo.optDouble("batteryInvestEur", def.solarAndGrid.batteryInvestEur)
+            )
+        } ?: def.solarAndGrid
+
+        // Hydraulics
+        val hydraulics = root.optJSONObject("hydraulics")?.let { hyo ->
+            HydraulicsSettings(floorDeltaT = hyo.optDouble("floorDeltaT", def.hydraulics.floorDeltaT))
+        } ?: def.hydraulics
+
+        // Fuels
+        val fuelList = mutableListOf<Fuel>()
+        root.optJSONArray("fuels")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                fuelList.add(
+                    Fuel(
+                        id = o.optString("id", "f_$i"),
+                        name = o.optString("name", "Energent"),
+                        unit = o.optString("unit", "€"),
+                        price = o.optDouble("price", 0.17),
+                        eff = o.optDouble("eff", 1.0),
+                        energyPerUnit = o.optDouble("energyPerUnit", 1.0),
+                        invest = o.optDouble("invest", 0.0)
+                    )
+                )
+            }
+        }
+        val fuels = if (fuelList.isNotEmpty()) fuelList else def.fuels
+
+        // Rooms
+        val roomList = mutableListOf<RoomElement>()
+        root.optJSONArray("rooms")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                roomList.add(
+                    RoomElement(
+                        id = o.optString("id", "rm_$i"),
+                        name = o.optString("name", "Soba"),
+                        area = o.optDouble("area", 15.0),
+                        ti = o.optDouble("ti", 21.0),
+                        expFactor = o.optDouble("expFactor", 1.0),
+                        spacing = o.optDouble("spacing", 15.0)
+                    )
+                )
+            }
+        }
+        val rooms = if (roomList.isNotEmpty()) roomList else def.rooms
+
+        // ROI
+        var roiFuelId = root.optString("roiFuelId", def.roiFuelId)
+        val roiMeasureList = mutableListOf<RoiMeasure>()
+        val roiObj = root.optJSONObject("roi")
+        if (roiObj != null) {
+            roiFuelId = roiObj.optString("selectedFuelId", roiFuelId)
+            roiObj.optJSONArray("measures")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    roiMeasureList.add(
+                        RoiMeasure(
+                            id = o.optString("id", "m_$i"),
+                            name = o.optString("name", "Ukrep"),
+                            area = o.optDouble("area", 100.0),
+                            uBefore = o.optDouble("uBefore", 1.0),
+                            uAfter = o.optDouble("uAfter", 0.2),
+                            invest = o.optDouble("invest", 5000.0),
+                            subsidy = o.optDouble("subsidy", 0.0)
+                        )
+                    )
+                }
+            }
+        } else {
+            root.optJSONArray("roiMeasures")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    roiMeasureList.add(
+                        RoiMeasure(
+                            id = o.optString("id", "m_$i"),
+                            name = o.optString("name", "Ukrep"),
+                            area = o.optDouble("area", 100.0),
+                            uBefore = o.optDouble("uBefore", 1.0),
+                            uAfter = o.optDouble("uAfter", 0.2),
+                            invest = o.optDouble("invest", 5000.0),
+                            subsidy = o.optDouble("subsidy", 0.0)
+                        )
+                    )
+                }
+            }
+        }
+        val roiMeasures = if (roiMeasureList.isNotEmpty()) roiMeasureList else def.roiMeasures
+
+        // Custom Materials
+        val customMats = mutableListOf<Material>()
+        root.optJSONArray("customMaterials")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                customMats.add(
+                    Material(
+                        id = o.optString("id", "usr_$i"),
+                        group = o.optString("group", "Moji materiali"),
+                        name = o.optString("name", "Material"),
+                        defD = o.optDouble("defD", 10.0),
+                        lambda = o.optDouble("lambda", 0.035),
+                        mu = o.optDouble("mu", 30.0),
+                        rho = o.optDouble("rho", 50.0),
+                        c = o.optDouble("c", 1400.0),
+                        colorHex = o.optString("color", "#0284c7"),
+                        ventilated = o.optBoolean("ventilated", false)
+                    )
+                )
+            }
+        }
+
+        // Scenario A
         val scenarioA = root.optJSONObject("scenarioA")?.let {
             ScenarioSnapshot(
                 totalW = it.optDouble("totalW", 0.0),
@@ -305,6 +697,19 @@ class AppStateRepository(context: Context) {
             walls = walls,
             roofs = roofs,
             floors = floors,
+            windows = windows,
+            doors = doors,
+            bridges = bridges,
+            ventilation = ventilation,
+            dhwAndWell = dhwAndWell,
+            hpSettings = hpSettings,
+            meterData = meterData,
+            solarAndGrid = solarAndGrid,
+            hydraulics = hydraulics,
+            fuels = fuels,
+            rooms = rooms,
+            roiMeasures = roiMeasures,
+            customMaterials = customMats,
             scenarioA = scenarioA
         )
     }

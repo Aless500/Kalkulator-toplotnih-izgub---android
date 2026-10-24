@@ -60,32 +60,28 @@ fun WindowsDoorsScreen(
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "🪟 Okna & Solarni dobitki",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Troslojna/dvoslojna zasteklitev in orientacija sonca",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "🪟 Okna & Solarni dobitki",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Troslojna/dvoslojna zasteklitev in orientacija sonca",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
                     Button(
                         onClick = { viewModel.addWindow() },
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.testTag("add_window_button")
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("add_window_button"),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Dodaj okno", fontSize = 12.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("+ Dodaj okno", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -142,32 +138,28 @@ fun WindowsDoorsScreen(
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "🚪 Vrata in podstrešne odprtine",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Izguba vrat: ${totalDoorLoss.toInt()} W",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "🚪 Vrata in podstrešne odprtine",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Izguba vrat: ${totalDoorLoss.toInt()} W",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
                     Button(
                         onClick = { viewModel.addDoor() },
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.testTag("add_door_button")
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("add_door_button"),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Dodaj vrata", fontSize = 12.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("+ Dodaj vrata", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 

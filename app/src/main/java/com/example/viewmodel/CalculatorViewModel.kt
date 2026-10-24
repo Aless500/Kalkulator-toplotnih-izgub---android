@@ -59,6 +59,45 @@ class CalculatorViewModel(application: Application) : AndroidViewModel(applicati
     fun switchTab(tabId: String) = mutate { it.copy(activeTabId = tabId) }
     fun toggleDarkMode() = mutate { it.copy(isDarkMode = !it.isDarkMode) }
 
+    fun exportJson(): String {
+        return repo.exportToJson(_state.value)
+    }
+
+    fun importJson(jsonStr: String): Boolean {
+        return try {
+            val newState = repo.importFromJson(jsonStr)
+            _state.value = newState
+            val allMats = computeAllMaterials(newState)
+            _materials.value = allMats
+            _totals.value = computeTotals(newState, allMats)
+            repo.saveState(newState)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    fun getSavedProjects(): List<Pair<String, Long>> = repo.getSavedProjects()
+
+    fun saveNamedProject(name: String) {
+        repo.saveNamedProject(name, _state.value)
+    }
+
+    fun loadNamedProject(name: String): Boolean {
+        val loaded = repo.loadNamedProject(name) ?: return false
+        _state.value = loaded
+        val allMats = computeAllMaterials(loaded)
+        _materials.value = allMats
+        _totals.value = computeTotals(loaded, allMats)
+        repo.saveState(loaded)
+        return true
+    }
+
+    fun deleteNamedProject(name: String) {
+        repo.deleteNamedProject(name)
+    }
+
     fun updateBoundary(
         ti: Double = _state.value.boundary.ti,
         te: Double = _state.value.boundary.te,

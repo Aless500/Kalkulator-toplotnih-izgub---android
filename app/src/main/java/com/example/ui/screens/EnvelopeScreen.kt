@@ -48,13 +48,19 @@ fun EnvelopeScreen(
             .padding(bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Group Header
-        Row(
+        // Group Header & Add Button
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            )
         ) {
-            Column {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp)
+            ) {
                 Text(
                     text = title,
                     fontSize = 17.sp,
@@ -62,20 +68,27 @@ fun EnvelopeScreen(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "PURES-3 meja: U ≤ ${stdLimit.first} W/m²K | Pasivna: ≤ ${stdLimit.second}",
+                    text = "PURES-3 meja: U ≤ ${stdLimit.first} W/m²K · Pasivni standard: U ≤ ${stdLimit.second} W/m²K",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-            Button(
-                onClick = { viewModel.addElement(groupKey) },
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.testTag("add_assembly_button")
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Dodaj sklop", fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(10.dp))
+                Button(
+                    onClick = { viewModel.addElement(groupKey) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("add_assembly_button"),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(vertical = 12.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "+ Dodaj nov konstrukcijski sklop",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
 

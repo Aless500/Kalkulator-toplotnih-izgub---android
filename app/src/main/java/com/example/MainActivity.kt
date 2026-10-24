@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.components.BoundaryCard
 import com.example.ui.components.SummaryCard
 import com.example.ui.dialogs.ReportDialog
+import com.example.ui.dialogs.SaveImportDialog
 import com.example.ui.screens.*
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.CalculatorViewModel
@@ -42,6 +43,7 @@ class MainActivity : ComponentActivity() {
             val materials by viewModel.materials.collectAsState()
 
             var showReportDialog by remember { mutableStateOf(false) }
+            var showSaveImportDialog by remember { mutableStateOf(false) }
             var showResetConfirmDialog by remember { mutableStateOf(false) }
 
             MyApplicationTheme(darkTheme = state.isDarkMode) {
@@ -75,6 +77,14 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             actions = {
+                                // Save / Import JSON button
+                                IconButton(
+                                    onClick = { showSaveImportDialog = true },
+                                    modifier = Modifier.testTag("save_import_top_button")
+                                ) {
+                                    Icon(Icons.Default.Save, contentDescription = "Shrani in uvozi")
+                                }
+
                                 // Scenario A button
                                 IconButton(
                                     onClick = {
@@ -151,6 +161,38 @@ class MainActivity : ComponentActivity() {
                             },
                             onSelectCityTe = { te -> viewModel.applyCityPreset(te) }
                         )
+
+                        // Quick Action Buttons: Save & Import JSON
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { showSaveImportDialog = true },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("quick_save_json_button"),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(vertical = 10.dp)
+                            ) {
+                                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("💾 Shrani (.json)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = { showSaveImportDialog = true },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("quick_import_json_button"),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(vertical = 10.dp)
+                            ) {
+                                Icon(Icons.Default.FileOpen, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("📂 Naloži (.json)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
 
                         // Hero Energy Summary Card with EPC scale
                         SummaryCard(
@@ -245,6 +287,13 @@ class MainActivity : ComponentActivity() {
                         totals = totals,
                         materials = materials,
                         onDismiss = { showReportDialog = false }
+                    )
+                }
+
+                if (showSaveImportDialog) {
+                    SaveImportDialog(
+                        viewModel = viewModel,
+                        onDismiss = { showSaveImportDialog = false }
                     )
                 }
 
